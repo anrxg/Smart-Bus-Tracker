@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'driver_qr_screen.dart';
 import 'student_qr_scanner.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,9 +73,19 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              "Realtime Bus Tracking System",
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+            Column(
+              children: const [
+                Icon(Icons.directions_bus, size: 60, color: Colors.blue),
+                SizedBox(height: 10),
+                Text(
+                  "Smart Bus Tracker",
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "Track Your College Bus in Real Time",
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+              ],
             ),
             const SizedBox(height: 30),
 
@@ -167,8 +178,8 @@ class _StudentHomeState extends State<StudentHome> {
   }
 
   void calculateETA(LatLng busPos) {
-    double studentLat = 26.8467;
-    double studentLng = 80.9462;
+    double studentLat = 25.343289;
+    double studentLng = 81.897586;
 
     double distance = Geolocator.distanceBetween(
       busPos.latitude,
@@ -320,14 +331,15 @@ class _StudentHomeState extends State<StudentHome> {
 
 class DriverHome extends StatefulWidget {
   const DriverHome({super.key});
-
   @override
   State<DriverHome> createState() => _DriverHomeState();
 }
 
 class _DriverHomeState extends State<DriverHome> {
   bool tripRunning = false;
-
+  double totalDistance = 0;
+  Position? previousPosition;
+  double fuelAverage = 0;
   StreamSubscription<Position>? positionStream;
 
   GoogleMapController? mapController;
@@ -348,6 +360,9 @@ class _DriverHomeState extends State<DriverHome> {
       return;
     }
 
+    final service = FlutterBackgroundService();
+    service.startService();
+
     setState(() {
       tripRunning = true;
     });
@@ -361,6 +376,26 @@ class _DriverHomeState extends State<DriverHome> {
         ).listen((Position position) {
           LatLng newPosition = LatLng(position.latitude, position.longitude);
 
+          /// DISTANCE CALCULATION
+          if (previousPosition != null) {
+            double distance = Geolocator.distanceBetween(
+              previousPosition!.latitude,
+              previousPosition!.longitude,
+              position.latitude,
+              position.longitude,
+            );
+
+            totalDistance += distance;
+
+            /// FUEL CALCULATION (assuming 10 km/l average)
+            double fuelUsed = totalDistance / 10000;
+
+            fuelAverage =
+                (totalDistance / 1000) / (fuelUsed == 0 ? 1 : fuelUsed);
+          }
+
+          previousPosition = position;
+
           setState(() {
             currentPosition = newPosition;
 
@@ -369,9 +404,12 @@ class _DriverHomeState extends State<DriverHome> {
             };
           });
 
+          /// FIREBASE UPDATE
           dbRef.set({
             "latitude": position.latitude,
             "longitude": position.longitude,
+            "distance": totalDistance,
+            "fuelAverage": fuelAverage,
             "status": "Running",
             "time": DateTime.now().toString(),
           });
