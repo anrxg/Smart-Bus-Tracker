@@ -73,8 +73,8 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Column(
-              children: const [
+            const Column(
+              children: [
                 Icon(Icons.directions_bus, size: 60, color: Colors.blue),
                 SizedBox(height: 10),
                 Text(
@@ -88,7 +88,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
             const SizedBox(height: 30),
-
             TextField(
               controller: idController,
               decoration: const InputDecoration(
@@ -96,9 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 20),
-
             TextField(
               controller: passwordController,
               obscureText: true,
@@ -107,13 +104,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 30),
-
             ElevatedButton(onPressed: login, child: const Text("Login")),
-
             const SizedBox(height: 15),
-
             Text(errorText, style: const TextStyle(color: Colors.red)),
           ],
         ),
@@ -131,32 +124,27 @@ class StudentHome extends StatefulWidget {
 
 class _StudentHomeState extends State<StudentHome> {
   final DatabaseReference dbRef = FirebaseDatabase.instance.ref("bus_location");
-
   GoogleMapController? mapController;
-
-  LatLng busPosition = const LatLng(26.8467, 80.9462);
-
+  LatLng busPosition = const LatLng(
+    25.343298,
+    81.897551,
+  ); // Initial camera target
   Set<Marker> markers = {};
   Set<Polyline> polylines = {};
-
   LatLng? previousPosition;
-
   String etaText = "Waiting for bus...";
   String busStatus = "Waiting...";
-
   BitmapDescriptor? busIcon;
 
   @override
   void initState() {
     super.initState();
-
     BitmapDescriptor.fromAssetImage(
       const ImageConfiguration(size: Size(48, 48)),
       'assets/bus_icon.png',
     ).then((icon) {
       busIcon = icon;
     });
-
     drawRoute();
     listenBusLocation();
   }
@@ -168,18 +156,18 @@ class _StudentHomeState extends State<StudentHome> {
         width: 5,
         color: Colors.blue,
         points: [
-          LatLng(26.8467, 80.9462),
-          LatLng(26.8500, 80.9500),
-          LatLng(26.8550, 80.9600),
-          LatLng(26.8600, 80.9700),
+          LatLng(25.3400, 81.8900),
+          LatLng(25.3432, 81.8975),
+          LatLng(25.3450, 81.9000),
         ],
       ),
     );
   }
 
   void calculateETA(LatLng busPos) {
-    double studentLat = 25.343289;
-    double studentLng = 81.897586;
+    // UPDATED STUDENT LOCATION COORDINATES
+    double studentLat = 25.343298359677494;
+    double studentLng = 81.89755136416476;
 
     double distance = Geolocator.distanceBetween(
       busPos.latitude,
@@ -188,14 +176,14 @@ class _StudentHomeState extends State<StudentHome> {
       studentLng,
     );
 
-    double speed = 15;
-
+    double speed = 15; // Average speed in m/s
     double timeSeconds = distance / speed;
-
     int minutes = (timeSeconds / 60).round();
 
     setState(() {
-      etaText = "Bus arriving in $minutes minutes";
+      etaText = distance < 50
+          ? "Bus is at your stop!"
+          : "Bus arriving in $minutes minutes";
     });
   }
 
@@ -206,7 +194,6 @@ class _StudentHomeState extends State<StudentHome> {
     }
 
     double latDiff = (newPosition.latitude - previousPosition!.latitude) / 10;
-
     double lngDiff = (newPosition.longitude - previousPosition!.longitude) / 10;
 
     for (int i = 1; i <= 10; i++) {
@@ -226,26 +213,21 @@ class _StudentHomeState extends State<StudentHome> {
             ),
           };
         });
-
         mapController?.animateCamera(CameraUpdate.newLatLng(intermediate));
       });
     }
-
     previousPosition = newPosition;
   }
 
   void listenBusLocation() {
     dbRef.onValue.listen((event) {
       if (!event.snapshot.exists) return;
-
       Map data = Map<String, dynamic>.from(event.snapshot.value as Map);
-
       double lat = data["latitude"];
       double lng = data["longitude"];
       String status = data["status"] ?? "Unknown";
 
       LatLng newPosition = LatLng(lat, lng);
-
       animateBus(newPosition);
       calculateETA(newPosition);
 
@@ -272,13 +254,12 @@ class _StudentHomeState extends State<StudentHome> {
           ),
         ],
       ),
-
       body: Stack(
         children: [
           GoogleMap(
             initialCameraPosition: CameraPosition(
               target: busPosition,
-              zoom: 14,
+              zoom: 15,
             ),
             markers: markers,
             polylines: polylines,
@@ -287,7 +268,6 @@ class _StudentHomeState extends State<StudentHome> {
               mapController = controller;
             },
           ),
-
           Positioned(
             top: 20,
             left: 20,
@@ -305,7 +285,6 @@ class _StudentHomeState extends State<StudentHome> {
               ),
             ),
           ),
-
           Positioned(
             top: 80,
             left: 20,
@@ -341,20 +320,15 @@ class _DriverHomeState extends State<DriverHome> {
   Position? previousPosition;
   double fuelAverage = 0;
   StreamSubscription<Position>? positionStream;
-
   GoogleMapController? mapController;
-
-  LatLng currentPosition = const LatLng(26.8467, 80.9462);
-
+  LatLng currentPosition = const LatLng(25.343298, 81.897551);
   Set<Marker> markers = {};
-
   final DatabaseReference dbRef = FirebaseDatabase.instance.ref("bus_location");
 
   Future<void> startTrip() async {
     if (tripRunning) return;
 
     LocationPermission permission = await Geolocator.requestPermission();
-
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
       return;
@@ -376,7 +350,6 @@ class _DriverHomeState extends State<DriverHome> {
         ).listen((Position position) {
           LatLng newPosition = LatLng(position.latitude, position.longitude);
 
-          /// DISTANCE CALCULATION
           if (previousPosition != null) {
             double distance = Geolocator.distanceBetween(
               previousPosition!.latitude,
@@ -384,34 +357,27 @@ class _DriverHomeState extends State<DriverHome> {
               position.latitude,
               position.longitude,
             );
-
             totalDistance += distance;
-
-            /// FUEL CALCULATION (assuming 10 km/l average)
-            double fuelUsed = totalDistance / 10000;
-
+            double fuelUsed = totalDistance / 10000; // Mock calculation
             fuelAverage =
                 (totalDistance / 1000) / (fuelUsed == 0 ? 1 : fuelUsed);
           }
 
           previousPosition = position;
-
           setState(() {
             currentPosition = newPosition;
-
             markers = {
               Marker(markerId: const MarkerId("bus"), position: newPosition),
             };
           });
 
-          /// FIREBASE UPDATE
           dbRef.set({
             "latitude": position.latitude,
             "longitude": position.longitude,
             "distance": totalDistance,
             "fuelAverage": fuelAverage,
             "status": "Running",
-            "time": DateTime.now().toString(),
+            "time": DateTime.now().toIso8601String(),
           });
 
           mapController?.animateCamera(CameraUpdate.newLatLng(newPosition));
@@ -421,9 +387,7 @@ class _DriverHomeState extends State<DriverHome> {
   void stopTrip() {
     positionStream?.cancel();
     positionStream = null;
-
     dbRef.update({"status": "Stopped"});
-
     setState(() {
       tripRunning = false;
     });
@@ -439,7 +403,6 @@ class _DriverHomeState extends State<DriverHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Driver Map Panel")),
-
       body: GoogleMap(
         initialCameraPosition: CameraPosition(
           target: currentPosition,
@@ -451,7 +414,6 @@ class _DriverHomeState extends State<DriverHome> {
           mapController = controller;
         },
       ),
-
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -461,18 +423,14 @@ class _DriverHomeState extends State<DriverHome> {
             onPressed: startTrip,
             child: const Icon(Icons.play_arrow),
           ),
-
           const SizedBox(height: 15),
-
           FloatingActionButton(
             heroTag: "stop",
             backgroundColor: Colors.red,
             onPressed: stopTrip,
             child: const Icon(Icons.stop),
           ),
-
           const SizedBox(height: 15),
-
           FloatingActionButton(
             heroTag: "qr",
             backgroundColor: Colors.blue,
@@ -494,7 +452,6 @@ class _DriverHomeState extends State<DriverHome> {
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
-
   @override
   State<AdminHome> createState() => _AdminHomeState();
 }
@@ -503,7 +460,6 @@ class _AdminHomeState extends State<AdminHome> {
   final DatabaseReference attendanceRef = FirebaseDatabase.instance.ref(
     "attendance",
   );
-
   List attendanceList = [];
 
   @override
@@ -515,15 +471,11 @@ class _AdminHomeState extends State<AdminHome> {
   void loadAttendance() {
     attendanceRef.onValue.listen((event) {
       if (!event.snapshot.exists) return;
-
       Map data = Map<String, dynamic>.from(event.snapshot.value as Map);
-
       List temp = [];
-
       data.forEach((key, value) {
         temp.add(value);
       });
-
       setState(() {
         attendanceList = temp;
       });
@@ -534,7 +486,6 @@ class _AdminHomeState extends State<AdminHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Admin Panel")),
-
       body: attendanceList.isEmpty
           ? const Center(
               child: Text(
@@ -546,7 +497,6 @@ class _AdminHomeState extends State<AdminHome> {
               itemCount: attendanceList.length,
               itemBuilder: (context, index) {
                 var record = attendanceList[index];
-
                 return Card(
                   margin: const EdgeInsets.all(10),
                   child: ListTile(
